@@ -57,7 +57,7 @@ public OnGameFrame()
 			lastReportTime[i] = GetGameTime();
 			char name[32];
 			GetClientName(i, name, sizeof(name));
-			PrintToServer("Detected possible freezeglitch by %s!", name);
+			PrintToServer("Detected possible freezeglitch by %s at tick %d", name, RoundToFloor(GetGameTime()*66.7));
 		}
 	}
 }
