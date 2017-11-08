@@ -46,7 +46,7 @@ public OnClientDisconnect(int client)
 
 public OnGameFrame()
 {
-	for(int i = 1; i < MaxClients; i++)
+	for(int i = 1; i <= MaxClients; i++)
 	{
 		if(!IsClientInGame(i))
 			continue;
