@@ -8,9 +8,9 @@ Handle g_freezeFoward;
 ConVar g_Cvar_Debug;
 bool   g_Debug = false;
 
-int clientLastActive[MAXPLAYERS];
-float clientPos[MAXPLAYERS][20];
-int lastReportTick[MAXPLAYERS];
+int clientLastActive[MAXPLAYERS+1];
+float clientPos[MAXPLAYERS+1][20];
+int lastReportTick[MAXPLAYERS+1];
 int index = 0;
 
 public Plugin myinfo =
