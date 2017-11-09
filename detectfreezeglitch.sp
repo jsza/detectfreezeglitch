@@ -1,16 +1,22 @@
 #pragma semicolon 1
 
 #include <sourcemod>
+#include <sdkhooks>
 #include <sdktools>
 #include <tf2_stocks>
+#define REFIRE_DELAY 56
 
 Handle g_freezeFoward;
 ConVar g_Cvar_Debug;
 bool   g_Debug = false;
 
-int clientLastActive[MAXPLAYERS];
-float clientPos[MAXPLAYERS][20];
-int lastReportTick[MAXPLAYERS];
+float TICK_INTERVAL;
+int clientLastActive[MAXPLAYERS+1];
+float clientPos[MAXPLAYERS+1][20];
+int lastReportTick[MAXPLAYERS+1];
+int lastFiredRocket[MAXPLAYERS+1];
+bool clientFrozen[MAXPLAYERS+1];
+int clientRefireDelay[MAXPLAYERS+1];
 int index = 0;
 
 public Plugin myinfo =
@@ -18,12 +24,13 @@ public Plugin myinfo =
 	name = "detectfreezeglitch",
 	author = "Larry",
 	description = "",
-	version = "1.0.0",
+	version = "1.0.1",
 	url = "http://steamcommunity.com/id/pancakelarry"
 };
 
 public OnPluginStart()
 {
+	TICK_INTERVAL = GetTickInterval();
 	g_freezeFoward = CreateGlobalForward("OnClientFreezeGlitch", ET_Event, Param_Cell, Param_Cell);
 	g_Cvar_Debug = CreateConVar("sm_detectfreezeglitch_debug", "0", "Print debug message upon detection");
 	g_Cvar_Debug.AddChangeHook(OnDebugChanged);
@@ -42,6 +49,27 @@ public OnClientDisconnect(int client)
 		clientLastActive[client] = 0;
 	}
 	lastReportTick[client] = 0;
+	clientFrozen[client] = false;
+}
+
+public OnEntityCreated(entity, const String:classname[])
+{
+	if(StrEqual(classname, "tf_projectile_rocket"))
+	{
+		SDKHook(entity, SDKHook_Spawn, OnRocketFired);
+	}
+}
+
+// this fires twice for each rocket spawned, but it seems to cause no problems
+public OnRocketFired(entity)
+{
+	new owner = GetEntPropEnt(entity, Prop_Send, "m_hOwnerEntity");
+	if(owner < 1 || owner > MaxClients)
+		return;
+	lastFiredRocket[owner] = GetGameTickCount();
+	// reset this here so we're not blocking clients that haven't frozen
+	// recently
+	clientRefireDelay[owner] = 0;
 }
 
 public OnGameFrame()
@@ -59,7 +87,7 @@ public OnGameFrame()
 			index = 0;
 
 		// get index 18 frames ago
-		int oldIndex = index - 18;
+		int oldIndex = index - 5;
 		if (oldIndex < 0)
 			oldIndex += 19;
 
@@ -76,17 +104,40 @@ public OnGameFrame()
 			&& !(GetEntityFlags(i) & FL_ONGROUND)
 			&& !(GetEntityMoveType(i) & MOVETYPE_LADDER)
 			&& clientPos[i][index] == clientPos[i][oldIndex]
-			&& frameLastActive >= 18
-			&& vecVel[2] != 0 && GetGameTickCount() - lastReportTick[i] > 66)
+			&& frameLastActive >= 5
+			&& vecVel[2] != 0)
 		{
-			lastReportTick[i] = GetGameTickCount();
-			FireFreezeGlitch(i, GetGameTickCount());
+			if (!clientFrozen[i]) {
+				int lastFired = GetGameTickCount() - lastFiredRocket[i];
 
-			if (g_Debug) {
-				char name[32];
-				GetClientName(i, name, sizeof(name));
-				PrintToServer("Detected possible freezeglitch by %s at tick %d", name, GetGameTickCount());
+				if (g_Debug) {
+					char name[32];
+					GetClientName(i, name, sizeof(name));
+					PrintToServer("Freezeglitch started by %s at tick %d", name, GetGameTickCount());
+				}
+
+				if (lastFired <= REFIRE_DELAY)
+					clientRefireDelay[i] = REFIRE_DELAY - lastFired;
+
+				FireFreezeGlitch(i, GetGameTickCount());
 			}
+			clientFrozen[i] = true;
+			clientRefireDelay[i] += 1;
+		}
+		else if (clientFrozen[i])
+		{
+			int delayAdded = lastFiredRocket[i] + clientRefireDelay[i] - GetGameTickCount();
+			if (delayAdded >= 0) {
+				if (g_Debug) {
+					char name[32];
+					GetClientName(i, name, sizeof(name));
+					PrintToServer("Freezeglitch ended by %s at tick %d", name, GetGameTickCount());
+				}
+				PrintToChat(
+					i, "Detected a freezeglitch and added %.3f sec to refire delay.",
+					float(delayAdded) * TICK_INTERVAL);
+			}
+			clientFrozen[i] = false;
 		}
 	}
 }
@@ -104,5 +155,19 @@ FireFreezeGlitch(client, tick)
 
 public Action:OnPlayerRunCmd(client, &buttons, &impulse, Float:vel[3], Float:angles[3], &weapon)
 {
-	clientLastActive[client] = GetGameTickCount();
+	int tick = GetGameTickCount();
+	clientLastActive[client] = tick;
+
+	int tickCanFire = lastFiredRocket[client] + clientRefireDelay[client];
+
+	if (tick >= tickCanFire) {
+		return Plugin_Continue;
+	}
+
+	if (buttons & IN_ATTACK) {
+		buttons &= ~IN_ATTACK;
+		return Plugin_Changed;
+	}
+
+	return Plugin_Continue;
 }
