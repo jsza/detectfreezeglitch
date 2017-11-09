@@ -46,10 +46,12 @@ public OnClientDisconnect(int client)
 	for(int i = 0; i < 19; i++)
 	{
 		clientPos[client][i] = 0.0;
-		clientLastActive[client] = 0;
 	}
 	lastReportTick[client] = 0;
 	clientFrozen[client] = false;
+	clientRefireDelay[client] = 0;
+	clientLastActive[client] = 0;
+	lastFiredRocket[client] = 0;
 }
 
 public OnEntityCreated(entity, const String:classname[])
@@ -86,7 +88,7 @@ public OnGameFrame()
 		else
 			index = 0;
 
-		// get index 18 frames ago
+		// get index 5 frames ago
 		int oldIndex = index - 5;
 		if (oldIndex < 0)
 			oldIndex += 19;
