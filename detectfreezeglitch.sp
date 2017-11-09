@@ -24,7 +24,7 @@ public Plugin myinfo =
 	name = "detectfreezeglitch",
 	author = "Larry",
 	description = "",
-	version = "1.0.1",
+	version = "1.0.2",
 	url = "http://steamcommunity.com/id/pancakelarry"
 };
 
@@ -98,14 +98,8 @@ public OnGameFrame()
 		GetEntPropVector(i, Prop_Data, "m_vecVelocity", vecVel);
 		clientPos[i][index] = vecPos[2];
 
-		int waterLevel = GetEntProp(i, Prop_Data, "m_nWaterLevel");
-
-		if(waterLevel < 2
-			&& !(GetEntityFlags(i) & FL_ONGROUND)
-			&& !(GetEntityMoveType(i) & MOVETYPE_LADDER)
-			&& clientPos[i][index] == clientPos[i][oldIndex]
-			&& frameLastActive >= 5
-			&& vecVel[2] != 0)
+		if(frameLastActive >= 5
+			&& clientPos[i][index] == clientPos[i][oldIndex])
 		{
 			if (!clientFrozen[i]) {
 				int lastFired = GetGameTickCount() - lastFiredRocket[i];
