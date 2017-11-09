@@ -165,7 +165,6 @@ public Action:OnPlayerRunCmd(client, &buttons, &impulse, Float:vel[3], Float:ang
 	}
 
 	if (buttons & IN_ATTACK) {
-		PrintToServer("Stopped you from firing.");
 		buttons &= ~IN_ATTACK;
 		return Plugin_Changed;
 	}
